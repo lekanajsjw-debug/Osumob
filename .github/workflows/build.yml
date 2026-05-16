@@ -36,13 +36,11 @@ jobs:
         run: |
           dotnet workload install android --ignore-failed-sources
 
-      - name: Find Android SDK targets
-        run: |
-          find /usr/share/dotnet/packs -name "Microsoft.Android.Sdk.targets" 2>/dev/null
-          find /usr/share/dotnet/packs -name "*.targets" 2>/dev/null | head -5
+      - name: Restore Android project
+        run: dotnet restore XamarinPosed/XamarinPosed.csproj
 
       - name: Build Android APK
-        run: /usr/share/dotnet/dotnet build XamarinPosed/XamarinPosed.csproj -c Release /p:AndroidPackageFormat=apk
+        run: dotnet msbuild XamarinPosed/XamarinPosed.csproj -c Release -p:AndroidPackageFormat=apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
