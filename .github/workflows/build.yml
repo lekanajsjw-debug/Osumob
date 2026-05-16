@@ -33,7 +33,13 @@ jobs:
           cmdline-tools: '11076708'
 
       - name: Install Android workload
-        run: dotnet workload install android --ignore-failed-sources
+        run: |
+          dotnet workload install android --ignore-failed-sources
+
+      - name: Find Android SDK targets
+        run: |
+          find /usr/share/dotnet/packs -name "Microsoft.Android.Sdk.targets" 2>/dev/null
+          find /usr/share/dotnet/packs -name "*.targets" 2>/dev/null | head -5
 
       - name: Build Android APK
         run: /usr/share/dotnet/dotnet build XamarinPosed/XamarinPosed.csproj -c Release /p:AndroidPackageFormat=apk
