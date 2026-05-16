@@ -49,6 +49,17 @@ jobs:
           dotnet workload install android --ignore-failed-sources --verbosity normal
           dotnet workload list
 
+      - name: Find Xamarin targets location
+        run: |
+          find ~/.dotnet -name "Xamarin.Android.CSharp.targets" 2>/dev/null || echo "Targets not found in ~/.dotnet"
+          find /usr -name "Xamarin.Android.CSharp.targets" 2>/dev/null || echo "Targets not found in /usr"
+          ls -la $ANDROID_SDK_ROOT/../..//usr/share/dotnet/sdk/*/ Xamarin/Android/ 2>/dev/null || echo "Checking SDK path..."
+
+      - name: Set environment variables
+        run: |
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+          echo "DOTNET_ROOT=$DOTNET_ROOT"
+
       - name: Restore Android project
         run: dotnet restore XamarinPosed/XamarinPosed.csproj --verbosity normal
 
