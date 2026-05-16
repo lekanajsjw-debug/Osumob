@@ -1,46 +1,52 @@
-name: Build APK
+name: Build Android APK
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
   workflow_dispatch:
+  push:
+    branches:
+      - main
+
 
 jobs:
   build:
-    runs-on: macos-latest
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    
-    - name: Setup .NET SDK
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: |
-          6.0.x
-          8.0.x
-          
-    - name: Install Xamarin.Android
-      run: |
-        dotnet tool install --global Xamarin.Android.Sdk --version 17.4.0 || true
-        export PATH="$PATH:$HOME/.dotnet/tools"
-        dotnet workload install android --from-rollback-file<<EOF
-RollbackFile=android
-EOF
+    runs-on: ubuntu-latest
 
-    - name: Restore NuGet packages
-      run: |
-        dotnet restore XamarinPosed/XamarinPosed.csproj
-        
-    - name: Build XamarinPosed (ARM64)
-      run: |
-        dotnet build XamarinPosed/XamarinPosed.csproj -c Release -p:AndroidABI=arm64-v8a -p:AndroidPackageFormat=Apk
-      shell: bash
-      
-    - name: Upload APK
-      uses: actions/upload-artifact@v4
-      with:
-        name: XamarinPosed-ARM64
-        path: XamarinPosed/bin/Release/**/**/*.apk
+    strategy:
+      matrix:
+        rid: [android-arm64]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Install Android workload
+        run: dotnet workload install android
+
+      - name: Restore NuGet packages
+        run: dotnet restore XamarinPosed/XamarinPosed.csproj
+
+      - name: Publish Android APK (${{ matrix.rid }})
+        run: |
+          dotnet publish XamarinPosed/XamarinPosed.csproj \
+            -c Release \
+            -f net8.0-android \
+            -r ${{ matrix.rid }} \
+            -p:AndroidPackageFormat=apk \
+            -p:AndroidUseAapt2=true
+
+      - name: Upload APK (${{ matrix.rid }})
+        uses: actions/upload-artifact@v4
+        with:
+          name: OsuRelax-${{ matrix.rid }}
+          path: XamarinPosed/bin/Release/net8.0-android/${{ matrix.rid }}/publish/*.apk
