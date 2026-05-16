@@ -49,21 +49,23 @@ jobs:
           dotnet workload install android --ignore-failed-sources --verbosity normal
           dotnet workload list
 
-      - name: Find Xamarin targets location
+      - name: Setup MSBuildExtensionsPath
         run: |
-          find ~/.dotnet -name "Xamarin.Android.CSharp.targets" 2>/dev/null || echo "Targets not found in ~/.dotnet"
-          find /usr -name "Xamarin.Android.CSharp.targets" 2>/dev/null || echo "Targets not found in /usr"
-          ls -la $ANDROID_SDK_ROOT/../..//usr/share/dotnet/sdk/*/ Xamarin/Android/ 2>/dev/null || echo "Checking SDK path..."
+          # Check where targets are located
+          TARGETS=$(find /usr/share/dotnet/packs -name "Xamarin.Android.CSharp.targets" 2>/dev/null | head -1)
+          if [ -n "$TARGETS" ]; then
+            echo "Found targets at: $TARGETS"
+            # Create MSBuildExtensionsPath directory structure
+            mkdir -p /usr/share/dotnet/MSBuildExtensions/Xamarin/Android
+            cp "$TARGETS" /usr/share/dotnet/MSBuildExtensions/Xamarin/Android/
+            ls -la /usr/share/dotnet/MSBuildExtensions/Xamarin/Android/
+          else
+            echo "Targets not found in packs"
+            # List available targets
+            find /usr/share/dotnet/packs -name "*.targets" 2>/dev/null | head -10
+          fi
 
-      - name: Set environment variables
-        run: |
-          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
-          echo "DOTNET_ROOT=$DOTNET_ROOT"
-
-      - name: Restore Android project
-        run: dotnet restore XamarinPosed/XamarinPosed.csproj --verbosity normal
-
-      - name: Publish Android APK (${{ matrix.rid }})
+      - name: Build Android APK
         run: |
           dotnet publish XamarinPosed/XamarinPosed.csproj \
             -c Release \
@@ -71,6 +73,8 @@ jobs:
             -r ${{ matrix.rid }} \
             -p:AndroidPackageFormat=apk \
             -p:AndroidUseAapt2=true \
+            -p:MSBuildExtensionsPath=/usr/share/dotnet/sdk/10.0.300/ \
+            -p:XamarinAndroidSdkRoot=/usr/share/dotnet/packs/Microsoft.Android.Sdk/linux \
             -v:normal
 
       - name: Upload APK (${{ matrix.rid }})
