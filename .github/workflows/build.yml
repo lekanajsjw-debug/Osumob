@@ -17,7 +17,12 @@ jobs:
       - name: Setup .NET SDK
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '6.0.456'
+          dotnet-version: '6.0.100'
+
+      - name: Clean NuGet caches
+        run: |
+          dotnet nuget locals all --clear
+          dotnet cache clean --all
 
       - name: Setup Java 17
         uses: actions/setup-java@v4
@@ -38,7 +43,11 @@ jobs:
 
       - name: Build Android APK
         run: |
-          # Clean only build directories (keep source code!)
+          # Check dotnet version
+          dotnet --version
+          # Show available workloads
+          dotnet workload list
+          # Clean only build directories
           rm -rf XPosedAPI/obj XPosedAPI/bin XamarinPosed/obj XamarinPosed/bin
           # Build
           dotnet build XamarinPosed/XamarinPosed.csproj -c Release
