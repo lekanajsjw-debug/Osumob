@@ -137,6 +137,12 @@
   <ItemGroup>
     <AndroidExternalJavaLibrary Include="Jars\api-82.jar" />
   </ItemGroup>
-  <!-- Use .NET Android SDK targets from workload -->
-  <Import Project="/usr/share/dotnet/packs/Microsoft.Android.Sdk.Linux/35.0.105/targets/Microsoft.Android.Sdk.targets" />
+  <Import Project="$(MSBuildExtensionsPath)\Xamarin\Android\Xamarin.Android.CSharp.targets" />
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it.
+    Other similar extension points exist, see Microsoft.Common.targets.
+    <Target Name="BeforeBuild">
+    </Target>
+    <Target Name="AfterBuild">
+    </Target>
+  -->
 </Project>
