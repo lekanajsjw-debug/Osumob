@@ -36,8 +36,7 @@ jobs:
         run: dotnet workload install android --ignore-failed-sources
 
       - name: Build Android APK
-        run: |
-          dotnet publish XamarinPosed/XamarinPosed.csproj -c Release -p:AndroidPackageFormat=apk -p:MSBuildExtensionsPath=/usr/share/dotnet/packs/Microsoft.Android.Sdk.Linux/35.0.105/targets/
+        run: dotnet publish XamarinPosed/XamarinPosed.csproj -c Release -p:AndroidPackageFormat=apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
