@@ -36,11 +36,39 @@ jobs:
         run: |
           dotnet workload install android --ignore-failed-sources
 
-      - name: Restore Android project
-        run: dotnet restore XamarinPosed/XamarinPosed.csproj
+      - name: Convert csproj to new SDK format
+        run: |
+          cat > XamarinPosed/XamarinPosed.csproj << 'EOF'
+<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0-android</TargetFramework>
+    <AssemblyName>XamarinPosed</AssemblyName>
+    <AndroidApplication>True</AndroidApplication>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Mono.Android" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\XPosedAPI\XPosedAPI.csproj" />
+  </ItemGroup>
+</Project>
+EOF
+          cat > XPosedAPI/XPosedAPI.csproj << 'EOF'
+<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0-android</TargetFramework>
+    <AssemblyName>XPosedAPI</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Mono.Android" />
+  </ItemGroup>
+</Project>
+EOF
 
       - name: Build Android APK
-        run: dotnet msbuild XamarinPosed/XamarinPosed.csproj -c Release -p:AndroidPackageFormat=apk
+        run: dotnet build XamarinPosed/XamarinPosed.csproj -c Release -p:AndroidPackageFormat=apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
