@@ -137,5 +137,4 @@
   <ItemGroup>
     <AndroidExternalJavaLibrary Include="Jars\api-82.jar" />
   </ItemGroup>
-  <!-- Legacy Xamarin targets - no longer needed with .NET Android SDK -->
-</PropertyGroup>
+</Project>
