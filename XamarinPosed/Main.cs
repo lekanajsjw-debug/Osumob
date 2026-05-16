@@ -2,17 +2,16 @@ using System;
 using Android.App;
 using Android.OS;
 using Android.Runtime;
-using AndroidX.AppCompat.AppCompatResources;
+using Android.Content;
 
 namespace XamarinPosed
 {
-    [Activity(Name = "xamarin.posed.Main", Label = "@string/app_name", Theme = "@style/AppTheme.NoActionBar", MainLauncher = true)]
-    public partial class Main : AndroidX.AppCompat.AppCompatActivity
+    [Activity(Name = "xamarin.posed.Main", Label = "@string/app_name", MainLauncher = true)]
+    public class Main : Activity
     {
         protected override void OnCreate(Bundle savedInstanceState)
         {
             base.OnCreate(savedInstanceState);
-            Microsoft.Maui.ApplicationModel.Platform.Init(this, savedInstanceState);
             SetContentView(Resource.Layout.activity_main);
         }
     }

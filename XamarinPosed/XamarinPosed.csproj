@@ -12,15 +12,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Xamarin.AndroidX.AppCompat" Version="1.7.0.2" />
-    <PackageReference Include="Xamarin.AndroidX.Core" Version="1.14.0.2" />
-    <PackageReference Include="Xamarin.AndroidX.Material" Version="1.12.0.2" />
-    <PackageReference Include="Xamarin.AndroidX.ConstraintLayout" Version="2.0.4.8" />
-    <PackageReference Include="Xamarin.AndroidX.CoordinatorLayout" Version="1.2.0.4" />
-    <PackageReference Include="Xamarin.AndroidX.RecyclerView" Version="1.3.2.6" />
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="..\XPosedAPI\XPosedAPI.csproj" />
   </ItemGroup>
 
