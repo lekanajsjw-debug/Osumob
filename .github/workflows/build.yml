@@ -15,18 +15,29 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
     
-    - name: Setup .NET
+    - name: Setup .NET SDK
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: '8.0.x'
-        
-    - name: Install Xamarin workload
+        dotnet-version: |
+          6.0.x
+          8.0.x
+          
+    - name: Install Xamarin.Android
       run: |
-        dotnet workload install android
+        dotnet tool install --global Xamarin.Android.Sdk --version 17.4.0 || true
+        export PATH="$PATH:$HOME/.dotnet/tools"
+        dotnet workload install android --from-rollback-file<<EOF
+RollbackFile=android
+EOF
+
+    - name: Restore NuGet packages
+      run: |
+        dotnet restore XamarinPosed/XamarinPosed.csproj
         
     - name: Build XamarinPosed (ARM64)
       run: |
         dotnet build XamarinPosed/XamarinPosed.csproj -c Release -p:AndroidABI=arm64-v8a -p:AndroidPackageFormat=Apk
+      shell: bash
       
     - name: Upload APK
       uses: actions/upload-artifact@v4
