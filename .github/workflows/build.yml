@@ -21,9 +21,7 @@ jobs:
       - name: Setup .NET SDK
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: |
-            6.0.x
-            8.0.x
+          dotnet-version: 8.0.x
 
       - name: Setup Java 17
         uses: actions/setup-java@v4
@@ -31,21 +29,23 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      - name: Cache workload
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v2
+        with:
+          cmdline-tools: 'latest'
+          api-level: 34
+          build-tools: '34.0.0'
+
+      - name: Cache dotnet
         uses: actions/cache@v4
         with:
-          path: ~/.dotnet/_framework
-          key: ${{ runner.os }}-dotnet-workload-${{ matrix.rid }}-${{ hashFiles('**/*.csproj') }}
+          path: ~/.dotnet
+          key: ${{ runner.os }}-dotnet-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-dotnet-
 
       - name: Install Android workload
-        run: |
-          dotnet workload install android --ignore-failed-sources || true
-          dotnet workload list
-
-      - name: Verify Xamarin targets
-        run: |
-          ls -la /usr/share/dotnet/sdk/10.0.300/ || true
-          find /usr -name "Xamarin.Android.CSharp.targets" 2>/dev/null || echo "Targets not found"
+        run: dotnet workload install android
 
       - name: Restore Android project
         run: dotnet restore XamarinPosed/XamarinPosed.csproj
