@@ -14,30 +14,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: microsoft
-          java-version: '17'
-
-      - name: Setup .NET
+      - name: Setup .NET 6.0
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '6.0.100'
+          dotnet-version: '6.0.x'
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v2
 
-      - name: Install workload
-        run: dotnet workload install android
-
       - name: Build
-        run: |
-          dotnet build XamarinPosed/XamarinPosed.csproj -c Release
-          dotnet publish XamarinPosed/XamarinPosed.csproj -c Release -o ./publish
+        run: dotnet build XamarinPosed/XamarinPosed.csproj -c Release
 
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
           name: OsuRelax
-          path: publish/*.apk
+          path: XamarinPosed/bin/Release/*.apk
