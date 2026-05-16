@@ -10,10 +10,6 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
-    strategy:
-      matrix:
-        rid: [android-arm64, android-arm, android-x86]
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -45,40 +41,84 @@ jobs:
             ${{ runner.os }}-dotnet-
 
       - name: Install Android workload
-        run: |
-          dotnet workload install android --ignore-failed-sources --verbosity normal
-          dotnet workload list
+        run: dotnet workload install android --ignore-failed-sources
 
-      - name: Setup MSBuildExtensionsPath
+      - name: Convert csproj to new SDK format
         run: |
-          # Check where targets are located
-          TARGETS=$(find /usr/share/dotnet/packs -name "Xamarin.Android.CSharp.targets" 2>/dev/null | head -1)
-          if [ -n "$TARGETS" ]; then
-            echo "Found targets at: $TARGETS"
-            # Create MSBuildExtensionsPath directory structure
-            mkdir -p /usr/share/dotnet/MSBuildExtensions/Xamarin/Android
-            cp "$TARGETS" /usr/share/dotnet/MSBuildExtensions/Xamarin/Android/
-            ls -la /usr/share/dotnet/MSBuildExtensions/Xamarin/Android/
-          else
-            echo "Targets not found in packs"
-            # List available targets
-            find /usr/share/dotnet/packs -name "*.targets" 2>/dev/null | head -10
-          fi
+          # Convert main project
+          cat > XamarinPosed/XamarinPosed.csproj.new << 'EOF'
+<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0-android</TargetFramework>
+    <AssemblyName>XamarinPosed</AssemblyName>
+    <AndroidApplication>True</AndroidApplication>
+    <AndroidUseLatestPlatformSdk>false</AndroidUseLatestPlatformSdk>
+    <AndroidPlatform>28</AndroidPlatform>
+    <SupportedAbis>armeabi-v7a;arm64-v8a;x86;x86_64</SupportedAbis>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Mono.Android" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\XPosedAPI\XPosedAPI.csproj" />
+  </ItemGroup>
+</Project>
+EOF
+          # Convert API project  
+          cat > XPosedAPI/XPosedAPI.csproj.new << 'EOF'
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <TargetFrameworkVersion>v9.0</TargetFrameworkVersion>
+    <TargetFramework>net8.0-android</TargetFramework>
+    <AssemblyName>XPosedAPI</AssemblyName>
+    <AndroidUseLatestPlatformSdk>false</AndroidUseLatestPlatformSdk>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>portable</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>portable</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Mono.Android" />
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Additions\Unhook.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <InputJar Include="Jars\api-82.jar" />
+  </ItemGroup>
+  <ItemGroup>
+    <TransformFile Include="Transforms\Metadata.xml" />
+    <TransformFile Include="Transforms\EnumFields.xml" />
+    <TransformFile Include="Transforms\EnumMethods.xml" />
+  </ItemGroup>
+  <Import Project="$(MSBuildExtensionsPath)Xamarin\Android\Xamarin.Android.Bindings.targets" />
+</Project>
+EOF
+          mv XamarinPosed/XamarinPosed.csproj.new XamarinPosed/XamarinPosed.csproj
+          mv XPosedAPI/XPosedAPI.csproj.new XPosedAPI/XPosedAPI.csproj
 
       - name: Build Android APK
         run: |
           dotnet publish XamarinPosed/XamarinPosed.csproj \
             -c Release \
-            -f net8.0-android \
-            -r ${{ matrix.rid }} \
-            -p:AndroidPackageFormat=apk \
-            -p:AndroidUseAapt2=true \
-            -p:MSBuildExtensionsPath=/usr/share/dotnet/sdk/10.0.300/ \
-            -p:XamarinAndroidSdkRoot=/usr/share/dotnet/packs/Microsoft.Android.Sdk/linux \
-            -v:normal
+            -p:AndroidPackageFormat=apk
 
-      - name: Upload APK (${{ matrix.rid }})
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: OsuRelax-${{ matrix.rid }}
-          path: XamarinPosed/bin/Release/net8.0-android/${{ matrix.rid }}/publish/*.apk
+          name: OsuRelax-android
+          path: XamarinPosed/bin/Release/net8.0-android/publish/*.apk
