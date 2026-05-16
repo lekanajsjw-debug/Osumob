@@ -40,25 +40,18 @@ jobs:
         run: |
           # Check available android templates
           dotnet new --list | grep -i android
-          # Clean existing directories
-          rm -rf XPosedAPI XamarinPosed
-          # Create Android library project
-          dotnet new androidlib -n XPosedAPI -o XPosedAPI
-          # Create Android app project
-          cd .
-          dotnet new android -n XamarinPosed -o XamarinPosed
-          # Add project reference from main app to API
-          cd XamarinPosed
-          dotnet add reference ../XPosedAPI/XPosedAPI.csproj
-          cd ..
-          # List project files
-          ls -la XamarinPosed/
-          ls -la XPosedAPI/
+          # Clean only build directories (keep source code!)
+          rm -rf XPosedAPI/obj XPosedAPI/bin XamarinPosed/obj XamarinPosed/bin
           # Build
           dotnet build XamarinPosed/XamarinPosed.csproj -c Release
+          # Publish
+          dotnet publish XamarinPosed/XamarinPosed.csproj -c Release -o ./publish
 
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
+      - name: Upload and Release APK
+        uses: softprops/action-gh-release@v2
         with:
-          name: OsuRelax-android
-          path: XamarinPosed/bin/Release/net8.0-android/publish/*.apk
+          files: publish/*.apk
+          name: Release Build
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
