@@ -9,7 +9,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     
     steps:
     - name: Checkout code
@@ -21,37 +21,18 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
         
-    - name: Setup Android SDK
-      uses: android-actions/setup-android@v2
-      
-    - name: Setup NuGet
+    - name: Install Visual Studio Build Tools
       run: |
-        dotnet nuget locals all --clear
-        dotnet tool install --global dotnet-nbgv || true
+        choco install visualstudio2022buildtools -y
+        choco install visualstudio2022-workload-net-xamarin -y
         
-    - name: Restore dependencies
-      run: |
-        dotnet restore XamarinPosed/XamarinPosed.csproj
-      shell: pwsh
-      
     - name: Build XamarinPosed (ARM64)
       run: |
-        dotnet build XamarinPosed/XamarinPosed.csproj -c Release -p:AndroidABI=arm64-v8a
-      shell: pwsh
-      
-    - name: Build Xamarin.Posed.Demo (ARM64)
-      run: |
-        dotnet build Xamarin.Posed.Demo/Xamarin.Posed.Demo.csproj -c Release -p:AndroidABI=arm64-v8a
-      shell: pwsh
+        msbuild XamarinPosed/XamarinPosed.csproj /p:Configuration=Release /p:AndroidABI=arm64-v8a /p:OutputPath=bin/Release/ARM64
+      shell: cmd
       
     - name: Upload XamarinPosed APK
       uses: actions/upload-artifact@v4
       with:
         name: XamarinPosed-ARM64
-        path: XamarinPosed/bin/Release/*/bin/**/*.apk
-        
-    - name: Upload Demo APK
-      uses: actions/upload-artifact@v4
-      with:
-        name: XamarinPosedDemo-ARM64
-        path: Xamarin.Posed.Demo/bin/Release/*/bin/**/*.apk
+        path: XamarinPosed/bin/Release/**/*.apk
