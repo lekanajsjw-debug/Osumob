@@ -137,4 +137,6 @@
   <ItemGroup>
     <AndroidExternalJavaLibrary Include="Jars\api-82.jar" />
   </ItemGroup>
+  <!-- Use .NET Android SDK targets from workload -->
+  <Import Project="/usr/share/dotnet/packs/Microsoft.Android.Sdk.Linux/35.0.105/targets/Microsoft.Android.Sdk.targets" />
 </Project>
