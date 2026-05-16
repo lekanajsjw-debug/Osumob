@@ -6,14 +6,13 @@ on:
     branches:
       - main
 
-
 jobs:
   build:
     runs-on: ubuntu-latest
 
     strategy:
       matrix:
-        rid: [android-arm64]
+        rid: [android-arm64, android-arm, android-x86]
 
     steps:
       - name: Checkout repository
@@ -33,7 +32,7 @@ jobs:
       - name: Install Android workload
         run: dotnet workload install android
 
-      - name: Restore NuGet packages
+      - name: Restore Android project
         run: dotnet restore XamarinPosed/XamarinPosed.csproj
 
       - name: Publish Android APK (${{ matrix.rid }})
