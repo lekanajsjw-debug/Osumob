@@ -38,16 +38,10 @@ jobs:
 
       - name: Build Android APK
         run: |
-          # Create minimal .NET Android project
-          mkdir -p XamarinPosed && cd XamarinPosed
-          dotnet new androidlib -n XamarinPosed --target-framework net8.0-android34 -o .
-          cd ..
-          cd XPosedAPI || mkdir -p XPosedAPI
-          cd XPosedAPI
-          dotnet new androidlib -n XPosedAPI --target-framework net8.0-android34 -o .
-          cd ..
-          # Build
-          dotnet build XamarinPosed/XamarinPosed.csproj -c Release
+          # Check available android templates
+          dotnet new --list | grep -i android
+          # Install templates
+          dotnet new install Microsoft.Android.Templates::
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
