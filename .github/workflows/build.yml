@@ -40,8 +40,19 @@ jobs:
         run: |
           # Check available android templates
           dotnet new --list | grep -i android
-          # Install templates
-          dotnet new install Microsoft.Android.Templates::
+          # Create Android library project
+          dotnet new androidlib -n XPosedAPI -o XPosedAPI --force
+          # Create Android app project
+          mkdir -p XamarinPosed
+          cd XamarinPosed
+          dotnet new android -n XamarinPosed -o . --force
+          cd ..
+          # Add project reference from main app to API
+          cd XamarinPosed
+          dotnet add reference ../XPosedAPI/XPosedAPI.csproj
+          cd ..
+          # Build
+          dotnet build XamarinPosed/XamarinPosed.csproj -c Release
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
