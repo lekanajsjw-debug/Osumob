@@ -12,7 +12,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v2
 
       - name: Cleanup SDK
         run: |
@@ -30,8 +30,11 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v2
 
-      - name: Build
-        run: dotnet build XamarinPosed/XamarinPosed.csproj -c Release
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v1.1
+
+      - name: Build Xamarin.Android
+        run: msbuild XamarinPosed/XamarinPosed.csproj -p:Configuration=Release
 
       - name: Upload
         uses: actions/upload-artifact@v4
