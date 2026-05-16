@@ -36,45 +36,18 @@ jobs:
         run: |
           dotnet workload install android --ignore-failed-sources
 
-      - name: Convert csproj to new SDK format
-        run: |
-          cat > XamarinPosed/XamarinPosed.csproj << 'EOF'
-<?xml version="1.0" encoding="utf-8"?>
-<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <TargetFramework>net8.0-android34</TargetFramework>
-    <AssemblyName>XamarinPosed</AssemblyName>
-    <RootNamespace>XamarinPosed</RootNamespace>
-    <AndroidApplication>True</AndroidApplication>
-    <AndroidPackageFormat>apk</AndroidPackageFormat>
-  </PropertyGroup>
-  <ItemGroup>
-    <Reference Include="Mono.Android" />
-    <Reference Include="Xamarin.Android.Support.Compat" />
-    <Reference Include="Xamarin.Android.Support.Core" />
-    <Reference Include="Xamarin.Android.Support.Design" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\XPosedAPI\XPosedAPI.csproj" />
-  </ItemGroup>
-</Project>
-EOF
-          cat > XPosedAPI/XPosedAPI.csproj << 'EOF'
-<?xml version="1.0" encoding="utf-8"?>
-<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <TargetFramework>net8.0-android34</TargetFramework>
-    <AssemblyName>XPosedAPI</AssemblyName>
-    <RootNamespace>XPosedAPI</RootNamespace>
-  </PropertyGroup>
-  <ItemGroup>
-    <Reference Include="Mono.Android" />
-  </ItemGroup>
-</Project>
-EOF
-
       - name: Build Android APK
-        run: dotnet build XamarinPosed/XamarinPosed.csproj -c Release -p:AndroidPackageFormat=apk
+        run: |
+          # Create minimal .NET Android project
+          mkdir -p XamarinPosed && cd XamarinPosed
+          dotnet new androidlib -n XamarinPosed --target-framework net8.0-android34 -o .
+          cd ..
+          cd XPosedAPI || mkdir -p XPosedAPI
+          cd XPosedAPI
+          dotnet new androidlib -n XPosedAPI --target-framework net8.0-android34 -o .
+          cd ..
+          # Build
+          dotnet build XamarinPosed/XamarinPosed.csproj -c Release
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
