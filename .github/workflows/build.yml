@@ -32,9 +32,9 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v2
         with:
-          cmdline-tools: 'latest'
           api-level: 34
           build-tools: '34.0.0'
+          cmdline-tools: '11076708'
 
       - name: Cache dotnet
         uses: actions/cache@v4
@@ -45,10 +45,12 @@ jobs:
             ${{ runner.os }}-dotnet-
 
       - name: Install Android workload
-        run: dotnet workload install android
+        run: |
+          dotnet workload install android --ignore-failed-sources --verbosity normal
+          dotnet workload list
 
       - name: Restore Android project
-        run: dotnet restore XamarinPosed/XamarinPosed.csproj
+        run: dotnet restore XamarinPosed/XamarinPosed.csproj --verbosity normal
 
       - name: Publish Android APK (${{ matrix.rid }})
         run: |
@@ -57,7 +59,8 @@ jobs:
             -f net8.0-android \
             -r ${{ matrix.rid }} \
             -p:AndroidPackageFormat=apk \
-            -p:AndroidUseAapt2=true
+            -p:AndroidUseAapt2=true \
+            -v:normal
 
       - name: Upload APK (${{ matrix.rid }})
         uses: actions/upload-artifact@v4
