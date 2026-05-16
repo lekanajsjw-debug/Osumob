@@ -15,24 +15,22 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
     
-    - name: Setup Java
-      uses: actions/setup-java@v4
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
       with:
-        java-version: '17'
-        distribution: 'temurin'
+        dotnet-version: '8.0.x'
         
-    - name: Install Visual Studio Build Tools
+    - name: Install Xamarin workload
       run: |
-        choco install visualstudio2022buildtools -y
-        choco install visualstudio2022-workload-net-xamarin -y
+        dotnet workload install android --ignore-failed-sources
         
     - name: Build XamarinPosed (ARM64)
       run: |
-        msbuild XamarinPosed/XamarinPosed.csproj /p:Configuration=Release /p:AndroidABI=arm64-v8a /p:OutputPath=bin/Release/ARM64
-      shell: cmd
+        dotnet build XamarinPosed/XamarinPosed.csproj -c Release -p:AndroidABI=arm64-v8a
+      shell: pwsh
       
-    - name: Upload XamarinPosed APK
+    - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
         name: XamarinPosed-ARM64
-        path: XamarinPosed/bin/Release/**/*.apk
+        path: XamarinPosed/bin/Release/**/**/*.apk
