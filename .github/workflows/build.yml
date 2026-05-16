@@ -24,6 +24,9 @@ jobs:
         with:
           dotnet-version: 6.0
 
+      - name: Install Android workload
+        run: dotnet workload install android
+
       - name: Setup Android SDK
         uses: android-actions/setup-android@v2
 
