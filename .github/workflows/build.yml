@@ -42,12 +42,17 @@ jobs:
 <?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net8.0-android</TargetFramework>
+    <TargetFramework>net8.0-android34</TargetFramework>
     <AssemblyName>XamarinPosed</AssemblyName>
+    <RootNamespace>XamarinPosed</RootNamespace>
     <AndroidApplication>True</AndroidApplication>
+    <AndroidPackageFormat>apk</AndroidPackageFormat>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="Mono.Android" />
+    <Reference Include="Xamarin.Android.Support.Compat" />
+    <Reference Include="Xamarin.Android.Support.Core" />
+    <Reference Include="Xamarin.Android.Support.Design" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\XPosedAPI\XPosedAPI.csproj" />
@@ -58,8 +63,9 @@ EOF
 <?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net8.0-android</TargetFramework>
+    <TargetFramework>net8.0-android34</TargetFramework>
     <AssemblyName>XPosedAPI</AssemblyName>
+    <RootNamespace>XPosedAPI</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="Mono.Android" />
