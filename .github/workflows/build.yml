@@ -40,17 +40,20 @@ jobs:
         run: |
           # Check available android templates
           dotnet new --list | grep -i android
+          # Clean existing directories
+          rm -rf XPosedAPI XamarinPosed
           # Create Android library project
-          dotnet new androidlib -n XPosedAPI -o XPosedAPI --force
+          dotnet new androidlib -n XPosedAPI -o XPosedAPI
           # Create Android app project
-          mkdir -p XamarinPosed
-          cd XamarinPosed
-          dotnet new android -n XamarinPosed -o . --force
-          cd ..
+          cd .
+          dotnet new android -n XamarinPosed -o XamarinPosed
           # Add project reference from main app to API
           cd XamarinPosed
           dotnet add reference ../XPosedAPI/XPosedAPI.csproj
           cd ..
+          # List project files
+          ls -la XamarinPosed/
+          ls -la XPosedAPI/
           # Build
           dotnet build XamarinPosed/XamarinPosed.csproj -c Release
 
