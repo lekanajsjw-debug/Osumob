@@ -8,28 +8,24 @@ on:
 
 jobs:
   build:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 9.0
-
-      - name: Install Android workload
-        run: dotnet workload install android
-
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v2
+          dotnet-version: 9.0.x
 
       - name: Build
-        run: dotnet build XamarinPosed/XamarinPosed.csproj -c Release
+        run: |
+          dotnet workload install android --source https://api.nuget.org/v3/index.json
+          dotnet build XamarinPosed/XamarinPosed.csproj -c Release
 
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
           name: OsuRelax
-          path: XamarinPosed/bin/Release/*.apk
+          path: XamarinPosed/bin/Release/**/*.apk
