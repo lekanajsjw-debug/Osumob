@@ -11,54 +11,24 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup .NET SDK
+      - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '6.0.100'
 
-      - name: Clean NuGet caches
+      - name: Install workload
+        run: dotnet workload install android
+
+      - name: Build
         run: |
-          dotnet nuget locals all --clear
-          dotnet cache clean --all
-
-      - name: Setup Java 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 17
-
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v2
-        with:
-          api-level: 34
-          build-tools: '34.0.0'
-          cmdline-tools: '11076708'
-
-      - name: Install Android workload
-        run: |
-          dotnet workload install android --ignore-failed-sources
-
-      - name: Build Android APK
-        run: |
-          # Check dotnet version
-          dotnet --version
-          # Show available workloads
-          dotnet workload list
-          # Clean only build directories
-          rm -rf XPosedAPI/obj XPosedAPI/bin XamarinPosed/obj XamarinPosed/bin
-          # Build
           dotnet build XamarinPosed/XamarinPosed.csproj -c Release
-          # Publish
           dotnet publish XamarinPosed/XamarinPosed.csproj -c Release -o ./publish
 
-      - name: Upload and Release APK
-        uses: softprops/action-gh-release@v2
+      - name: Upload
+        uses: actions/upload-artifact@v4
         with:
-          files: publish/*.apk
-          name: Release Build
-          generate_release_notes: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          name: OsuRelax
+          path: publish/*.apk
