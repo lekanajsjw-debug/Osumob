@@ -1,24 +1,24 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net10.0-android</TargetFramework>
+    <TargetFramework>net8.0-android</TargetFramework>
     <SupportedOSPlatformVersion>21</SupportedOSPlatformVersion>
     <OutputType>Exe</OutputType>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <ApplicationId>xamarin.posed</ApplicationId>
-    <ApplicationVersion>2</ApplicationVersion>
-    <ApplicationDisplayVersion>2.0</ApplicationDisplayVersion>
+    <ApplicationVersion>3</ApplicationVersion>
+    <ApplicationDisplayVersion>3.0.0</ApplicationDisplayVersion>
     <AndroidUseSharedRuntime>false</AndroidUseSharedRuntime>
-<AfterGenerateAndroidManifest>
-  $(AfterGenerateAndroidManifest);
-  JavaCodePostProcess;
-</AfterGenerateAndroidManifest>
-<PostProcessArgProjectDir>"$(ProjectDir)"</PostProcessArgProjectDir>
-<Authors>UlyssesWu</Authors>
-<RepositoryUrl>https://github.com/UlyssesWu/XamarinPosed.Core</RepositoryUrl>
-<Copyright>wdwxy12345@gmail.com</Copyright>
-<Description>Xposed module using Xamarin &amp; .NET 🐱‍💻</Description>
-<PackageTags>xposed;xamarin;</PackageTags>
+    <AfterGenerateAndroidManifest>
+      $(AfterGenerateAndroidManifest);
+      JavaCodePostProcess;
+    </AfterGenerateAndroidManifest>
+    <PostProcessArgProjectDir>"$(ProjectDir)"</PostProcessArgProjectDir>
+    <Authors>UlyssesWu</Authors>
+    <RepositoryUrl>https://github.com/UlyssesWu/XamarinPosed.Core</RepositoryUrl>
+    <Copyright>wdwxy12345@gmail.com</Copyright>
+    <Description>Xposed module using Xamarin &amp; .NET 🐱‍💻</Description>
+    <PackageTags>xposed;xamarin;</PackageTags>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
     <AndroidPackageFormat>apk</AndroidPackageFormat>
@@ -32,11 +32,11 @@
     <IsAotCompatible>True</IsAotCompatible>
     <EmbedAssembliesIntoApk>True</EmbedAssembliesIntoApk>
   </PropertyGroup>
-<Target Name="JavaCodePostProcess">
-	<Exec Command="&quot;$(SolutionDir)JavaCodePostProcessor\bin\$(ConfigurationName)\net8.0\JavaCodePostProcessor.exe&quot; $(ConfigurationName) $(PostProcessArgProjectDir) $(DefineConstants)" ConsoleToMSBuild="true">
-		<Output TaskParameter="ConsoleOutput" PropertyName="OutputOfExec" />
-	</Exec>
-</Target>
+  <Target Name="JavaCodePostProcess">
+    <Exec Command="dotnet &quot;$(SolutionDir)JavaCodePostProcessor\bin\$(ConfigurationName)\net8.0\JavaCodePostProcessor.dll&quot; $(ConfigurationName) &quot;$(PostProcessArgProjectDir)&quot; &quot;$(DefineConstants)&quot;" ConsoleToMSBuild="true">
+      <Output TaskParameter="ConsoleOutput" PropertyName="OutputOfExec" />
+    </Exec>
+  </Target>
   <ItemGroup>
     <AndroidLibrary Remove="api-82.jar" />
     <AndroidLibrary Remove="..\XPosedAPI\*" />
@@ -48,9 +48,9 @@
     <Folder Include="Assets\" />
     <Folder Include="libs\" />
   </ItemGroup>
-    <ItemGroup>
-	    <Reference Include="XPosedAPI">
-		    <HintPath>..\ref\Release\net10.0-android\XPosedAPI.dll</HintPath>
-	    </Reference>
-    </ItemGroup>
+  <ItemGroup>
+    <Reference Include="XPosedAPI">
+      <HintPath>..\ref\Release\net8.0-android\XPosedAPI.dll</HintPath>
+    </Reference>
+  </ItemGroup>
 </Project>

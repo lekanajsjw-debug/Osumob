@@ -1,32 +1,52 @@
-name: Build
+name: Build APK
 
 on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    
     steps:
-      - uses: actions/checkout@v4
-      
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 9.0.x
-
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Build
+          dotnet-version: 8.0.x
+          
+      - name: Install Android workload
+        run: dotnet workload install android
+        
+      - name: Build XamarinPosed
         run: |
-          dotnet workload install android
-          dotnet build XamarinPosed/XamarinPosed.csproj -c Release -p:AndroidSdkDirectory=$ANDROID_SDK_ROOT
-
+          dotnet restore XamarinPosed/XamarinPosed.csproj
+          dotnet build XamarinPosed/XamarinPosed.csproj -c Release --no-restore
+          
+      - name: Build JavaCodePostProcessor
+        run: |
+          dotnet build JavaCodePostProcessor/JavaCodePostProcessor.csproj -c Release
+          
+      - name: Find APK
+        id: find_apk
+        run: |
+          APK_PATH=$(find XamarinPosed/bin/Release -name "*.apk" -type f | head -1)
+          echo "APK path: $APK_PATH"
+          if [ -z "$APK_PATH" ]; then
+            echo "No APK found!"
+            ls -la XamarinPosed/bin/Release/
+            exit 1
+          fi
+          echo "apk_path=$APK_PATH" >> $GITHUB_OUTPUT
+          
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: apk
-          path: |
-            XamarinPosed/bin/Release/*.apk
-            XamarinPosed/bin/Release/*.aab
-          if-no-files-found: error
+          name: XamarinPosed-release.apk
+          path: ${{ steps.find_apk.outputs.apk_path }}
+          retention-days: 5
