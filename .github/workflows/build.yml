@@ -18,33 +18,48 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 8.0.x
+          dotnet-version: 9.0.x
+          
+      - name: Cache Android SDK
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/sdk
+          key: android-sdk-${{ runner.os }}-v1
+          
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          api-level: 34
+          build-tools: 34.0.0
           
       - name: Install Android workload
         run: dotnet workload install android
         
+      - name: Restore packages
+        run: dotnet restore XamarinPosed/XamarinPosed.csproj
+        
       - name: Build XamarinPosed
-        run: |
-          dotnet restore XamarinPosed/XamarinPosed.csproj
-          dotnet build XamarinPosed/XamarinPosed.csproj -c Release --no-restore
+        run: dotnet build XamarinPosed/XamarinPosed.csproj -c Release --no-restore -p:AndroidSdkDirectory=$ANDROID_SDK_ROOT
           
       - name: Build JavaCodePostProcessor
-        run: |
-          dotnet build JavaCodePostProcessor/JavaCodePostProcessor.csproj -c Release
-          
+        run: dotnet build JavaCodePostProcessor/JavaCodePostProcessor.csproj -c Release
+        
       - name: Find APK
         id: find_apk
         run: |
-          APK_PATH=$(find XamarinPosed/bin/Release -name "*.apk" -type f | head -1)
-          echo "APK path: $APK_PATH"
-          if [ -z "$APK_PATH" ]; then
+          find XamarinPosed/bin/Release -name "*.apk" -type f > apk_paths.txt
+          if [ -s apk_paths.txt ]; then
+            APK_PATH=$(head -1 apk_paths.txt)
+            echo "Found APK: $APK_PATH"
+            echo "apk_path=$APK_PATH" >> $GITHUB_OUTPUT
+          else
             echo "No APK found!"
             ls -la XamarinPosed/bin/Release/
             exit 1
           fi
-          echo "apk_path=$APK_PATH" >> $GITHUB_OUTPUT
           
       - name: Upload APK
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: XamarinPosed-release.apk
