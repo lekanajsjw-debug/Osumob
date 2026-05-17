@@ -2,6 +2,7 @@
 
   <PropertyGroup>
     <TargetFramework>net9.0-android</TargetFramework>
+    <SupportedOSPlatformVersion>26</SupportedOSPlatformVersion>
     <CheckEolTargetFramework>false</CheckEolTargetFramework>
     <OutputType>Library</OutputType>
     <RootNamespace>XamarinPosed</RootNamespace>
