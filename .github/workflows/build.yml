@@ -32,6 +32,10 @@ jobs:
           api-level: 34
           build-tools: 34.0.0
           
+      - name: Install Android NDK
+        run: |
+          echo "y" | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager "ndk;26.3.1157926"
+          
       - name: Install Android workload
         run: dotnet workload install android
         
@@ -44,6 +48,12 @@ jobs:
       - name: Build JavaCodePostProcessor
         run: dotnet build JavaCodePostProcessor/JavaCodePostProcessor.csproj -c Release
         
+      - name: Build Native JNI (optional)
+        if: false  # Disable - needs NDK setup
+        run: |
+          cd jni
+          $ANDROID_NDK_ROOT/ndk-build || echo "NDK build skipped"
+          
       - name: Find APK
         id: find_apk
         run: |

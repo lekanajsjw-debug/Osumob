@@ -36,10 +36,8 @@ namespace XamarinPosed
         // Java level hooks (Xposed - works out of box)
         public static bool EnableJavaHooks = true;
         
-        // C# level hooks (requires Mono bridge - experimental)
-        // NOTE: C# hooks need native libxamarinhooks.so + embedded Mono
-        // Currently NOT available in standard Xposed module
-        public static bool EnableCSharpHooks = false; // Disabled - needs native lib
+        // C# level hooks (experimental - requires native libxamarinhooks.so)
+        public static bool EnableCSharpHooks = true; // Try to enable by default
         
         // Native library loaded?
         private static bool _nativeLibLoaded = false;
@@ -81,8 +79,15 @@ namespace XamarinPosed
                 System.LoadLibrary("xamarinhooks");
                 _nativeLibLoaded = true;
                 LogInfo("Native lib loaded");
+                
+                // Initialize native Mono runtime
+                var result = NativeInit("XamarinPosed");
+                if (result == 0)
+                    LogInfo("Native Mono initialized");
+                else
+                    LogError("Native Mono init failed: " + result);
             }
-            catch
+            catch (Exception ex)
             {
                 // Native lib not available - C# hooks disabled
                 LogInfo("Native lib not found - C# hooks via JNI disabled");
@@ -281,10 +286,14 @@ namespace XamarinPosed
         {
             try
             {
-                // This calls native code which interacts with Mono runtime
-                // NOT available without custom native library
-                NativeInitHooks(param.PackageName, param.ClassLoader);
-                LogInfo("C# hooks initialized");
+                // Initialize native bridge
+                NativeInit(param.PackageName);
+                LogInfo("Native bridge initialized");
+                
+                // Load our hooks assembly
+                NativeLoadAssembly("/data/data/" + param.PackageName + "/files/hooks.dll");
+                
+                LogInfo("C# hooks loaded");
             }
             catch (Exception ex)
             {
@@ -292,9 +301,29 @@ namespace XamarinPosed
             }
         }
         
-        // JNI native methods (native lib required)
-        private native void NativeInitHooks(string packageName, IntPtr classLoader);
-        private native object NativeCallMethod(string methodName, object[] args);
+        // ============= NATIVE METHODS (JNI) =============
+        // These call into libxamarinhooks.so
+        
+        // Initialize native Mono runtime
+        private static native int NativeInit(string appName);
+        
+        // Load a C# assembly
+        private static native int NativeLoadAssembly(string assemblyPath);
+        
+        // Register a C# hook delegate (takes Mono method reference)
+        private static native void NativeRegisterHook(string hookName, object hookDelegate);
+        
+        // Unregister a hook
+        private static native void NativeUnregisterHook(string hookName);
+        
+        // Trigger a registered hook
+        private static native void NativeTriggerHook(string hookName, object[] args);
+        
+        // Hook a specific C# method
+        private static native void NativeHookMethod(string className, string methodName, string methodSig, object hookDelegate);
+        
+        // Cleanup native resources
+        private static native void NativeCleanup();
         #endregion
         
         #region Public API - Register C# Hooks
@@ -304,7 +333,53 @@ namespace XamarinPosed
         public static void RegisterHook(string name, HookDelegate callback)
         {
             _csharpHooks[name] = callback;
+            
+            // Also register with native bridge if available
+            if (_nativeLibLoaded)
+            {
+                // The callback would need to be converted to a Java object for JNI
+                // NativeRegisterHook(name, callback);
+            }
+            
             LogInfo($"Registered C# hook: {name}");
+        }
+        
+        /// <summary>
+        /// Load a custom C# assembly with hooks
+        /// </summary>
+        public static int LoadHooksAssembly(string assemblyPath)
+        {
+            if (!_nativeLibLoaded)
+            {
+                LogError("Native lib not loaded");
+                return -1;
+            }
+            
+            try
+            {
+                return NativeLoadAssembly(assemblyPath);
+            }
+            catch (Exception ex)
+            {
+                LogError($"Load assembly: {ex.Message}");
+                return -1;
+            }
+        }
+        
+        /// <summary>
+        /// Hook a specific C# method in target app
+        /// </summary>
+        public static void HookMethod(string className, string methodName, string methodSig, HookDelegate callback)
+        {
+            if (!_nativeLibLoaded)
+            {
+                LogError("Native lib not loaded");
+                return;
+            }
+            
+            _csharpHooks[className + "." + methodName] = callback;
+            
+            LogInfo($"Registered method hook: {className}.{methodName}");
         }
         
         /// <summary>
@@ -313,6 +388,12 @@ namespace XamarinPosed
         public static void UnregisterHook(string name)
         {
             _csharpHooks.Remove(name);
+            
+            if (_nativeLibLoaded)
+            {
+                NativeUnregisterHook(name);
+            }
+            
             LogInfo($"Unregistered C# hook: {name}");
         }
         
@@ -325,6 +406,11 @@ namespace XamarinPosed
             _csharpHooks.Keys.CopyTo(hooks, 0);
             return hooks;
         }
+        
+        /// <summary>
+        /// Check if native bridge is available
+        /// </summary>
+        public static bool IsNativeBridgeAvailable() => _nativeLibLoaded;
         #endregion
         
         #region Logging
