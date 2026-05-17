@@ -14,13 +14,19 @@ jobs:
         with:
           dotnet-version: 9.0.x
 
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
       - name: Build
         run: |
           dotnet workload install android
           dotnet build XamarinPosed/XamarinPosed.csproj -c Release -p:AndroidSdkDirectory=$ANDROID_SDK_ROOT
 
-      - name: Upload
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: apk
-          path: XamarinPosed/bin/Release/*.apk
+          path: |
+            XamarinPosed/bin/Release/*.apk
+            XamarinPosed/bin/Release/*.aab
+          if-no-files-found: error
