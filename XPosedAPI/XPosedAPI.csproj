@@ -5,6 +5,7 @@
     <CheckEolTargetFramework>false</CheckEolTargetFramework>
     <RootNamespace>XPosedAPI</RootNamespace>
     <AssemblyName>XPosedAPI</AssemblyName>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
   </PropertyGroup>
 
 </Project>
