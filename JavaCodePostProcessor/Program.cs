@@ -25,9 +25,9 @@ namespace XamarinPosed.JavaCodePostProcessor
             {
                 defines = args[2];
             }
-            
-            Console.WriteLine($"ProjectDir: {projectDir}");
+
             Console.WriteLine($"Configuration: {configuration}");
+            Console.WriteLine($"ProjectDir: {projectDir}");
             Console.WriteLine($"DefineConstants: {defines}");
             var verDirs = Directory.GetDirectories(Path.Combine(projectDir, "obj", configuration));
 

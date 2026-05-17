@@ -1,35 +1,29 @@
-using System;
-using System.IO;
+using Android.Runtime;
 using Android.Util;
 using Android.Views;
-using Android.Widget;
 using DE.Robv.Android.Xposed;
 using DE.Robv.Android.Xposed.Callbacks;
 
 namespace XamarinPosed
 {
-    public partial class Main
+     public partial class Main
     {
         /// <summary>
-        /// OsuRelax - Auto click module for osu!Lazer
-        /// Written for use with XamarinPosed/LSPosed
+        /// Write your logic here
         /// </summary>
+        [Register("xamarin/posed/Main_Loader")]
         public class Loader : Java.Lang.Object, IXposedHookLoadPackage, IXposedHookZygoteInit, IXposedHookInitPackageResources
         {
-            // osu!Lazer package name
-            private const string OsuLazerPackage = "sh.ppy.osulazer";
-
             public string BaseApkPath;
             public string PackageName;
             public bool IsXamarinApp = false;
 
-            // Track if hooks are already applied
-            private static bool hooksApplied = false;
-
             public Loader()
             {
-                XposedBridge.Log("OsuRelax: Loader created.");
+                Log.Info("XamarinPosed", "XamarinPosed Core Loader created.");
             }
+
+            public Loader(IntPtr handle, JniHandleOwnership transfer) : base(handle, transfer) { }
 
             public Loader(string baseApkPath, string packageName)
             {
@@ -37,33 +31,42 @@ namespace XamarinPosed
                 PackageName = packageName;
             }
 
-            public void HandleLoadPackage(XC_LoadPackage.LoadPackageParam param)
+            /// <summary>
+            /// Write your logic here
+            /// </summary>
+            /// <param name="param"></param>
+            public void HandleLoadPackage(XC_LoadPackage.LoadPackageParam? param)
             {
                 DetectAndFixXamarinApp(param);
-                XposedBridge.Log("OsuRelax: HandleLoadPackage: " + param.PackageName);
-
-                // Hook osu!Lazer!
-                if (param.PackageName == OsuLazerPackage)
-                {
-                    HookOsuLazer(param);
-                }
+                Log.Info("XamarinPosed", "XamarinPosed HandleLoadPackage: " + param.PackageName);
+                //This is a demo, remove it
+                HookMyself(param);
             }
 
-            public void InitZygote(XposedHookZygoteInitStartupParam param)
+            /// <summary>
+            /// Write your logic here
+            /// </summary>
+            /// <param name="param"></param>
+            public void InitZygote(IXposedHookZygoteInit.StartupParam? param)
             {
-                XposedBridge.Log("OsuRelax: InitZygote: " + param.ModulePath);
+                Log.Info("XamarinPosed", "XamarinPosed InitZygote: " + param?.ModulePath);
             }
 
-            public void HandleInitPackageResources(XC_InitPackageResources.InitPackageResourcesParam param)
+            /// <summary>
+            /// Write your logic here
+            /// </summary>
+            /// <param name="param"></param>
+            public void HandleInitPackageResources(XC_InitPackageResources.InitPackageResourcesParam? param)
             {
-                XposedBridge.Log("OsuRelax: HandleInitPackageResources: " + param.PackageName);
+                Log.Info("XamarinPosed", "XamarinPosed HandleInitPackageResources: " + param?.PackageName);
             }
 
             private bool DetectAndFixXamarinApp(XC_LoadPackage.LoadPackageParam param)
             {
-                var nativeDir = param.AppInfo.NativeLibraryDir;
+                var nativeDir = param.AppInfo?.NativeLibraryDir;
                 if (nativeDir == null)
                 {
+                    Log.Info("XamarinPosed", "native dir is null");
                     IsXamarinApp = false;
                     return false;
                 }
@@ -71,181 +74,52 @@ namespace XamarinPosed
                 foreach (var file in Directory.EnumerateFiles(nativeDir))
                 {
                     var lib = Path.GetFileName(file);
-                    if (lib == "libxamarin-app.so" || lib == "libmono-native.so" || lib == "libmonodroid.so")
+                    if (lib == "libxamarin-app.so" || lib == "libmono-native.so" || lib == "libmonodroid.so" || lib == "libxamarin-debug-app-helper.so")
                     {
-                        XposedBridge.Log("OsuRelax: Found Xamarin App: " + param.PackageName);
+                        Log.Info("XamarinPosed", "XamarinPosed found Xamarin App: " + param.PackageName);
+                        //TODO:
+                        //var unhook = XposedHelpers.FindAndHookMethod("android.content.Context", param.ClassLoader, "getClassLoader",
+                        //    new Context_GetClassLoaderHook());
+
                         IsXamarinApp = true;
                         return true;
                     }
                 }
+
                 return false;
             }
 
-            // ============================================================
-            // OSU!LAZER HOOKS
-            // ============================================================
 
-            private void HookOsuLazer(XC_LoadPackage.LoadPackageParam param)
+            private static bool isThisAppHooked = false;
+
+            private void HookMyself(XC_LoadPackage.LoadPackageParam param)
             {
-                if (hooksApplied)
+                Log.Debug("XamarinPosed", $"LoadPackageParam: {param.PackageName}, {param.ProcessName}, {param.AppInfo}, {param.ClassLoader}");
+                if (isThisAppHooked)
                 {
-                    XposedBridge.Log("OsuRelax: Hooks already applied, skipping...");
                     return;
                 }
-
-                XposedBridge.Log("OsuRelax: Starting hooks for osu!Lazer...");
-
-                try
+                
+                if (param.PackageName.Equals("com.companyname.NetAndroidApp", StringComparison.InvariantCultureIgnoreCase))
                 {
-                    // Hook 1: HitReceptor.Hit() - when player taps a circle
-                    HookHitReceptor(param);
-
-                    // Hook 2: DrawableHitCircle.CheckForResult - hit validation
-                    HookHitCircleCheckResult(param);
-
-                    // Hook 3: HitReceptor.OnPressed - key/button press
-                    HookHitReceptorOnPressed(param);
-
-                    hooksApplied = true;
-                    XposedBridge.Log("OsuRelax: All hooks applied successfully!");
-                }
-                catch (Exception ex)
-                {
-                    XposedBridge.Log("OsuRelax: ERROR: " + ex.Message);
-                    XposedBridge.Log("OsuRelax: StackTrace: " + ex.StackTrace);
+                    Log.Info("XamarinPosed", "XamarinPosed HookMyself: " + param.PackageName);
+                    var unhook = XposedHelpers.FindAndHookMethod("crc647b8f161eb0a155af.MainActivity_MySnackBarClickListener", param.ClassLoader, "onClick", "android.view.View", new SelfDemoHook());
+                    isThisAppHooked = true;
+                    Log.Info("XamarinPosed", "XamarinPosed HookMyself done");
                 }
             }
 
-            private void HookHitReceptor(XC_LoadPackage.LoadPackageParam param)
-            {
-                try
-                {
-                    // HitReceptor is a nested class: osu.Game.Rulesets.Osu.Objects.Drawables+HitReceptor
-                    var hitReceptorClass = XposedHelpers.FindClass(
-                        "osu.Game.Rulesets.Osu.Objects.Drawables+HitReceptor",
-                        param.ClassLoader
-                    );
+        }
+    }
 
-                    if (hitReceptorClass == null)
-                    {
-                        XposedBridge.Log("OsuRelax: HitReceptor class not found, trying alternative...");
-                        
-                        // Try alternative class name
-                        hitReceptorClass = XposedHelpers.FindClass(
-                            "osu.Game.Rulesets.Osu.UI.HitReceptor",
-                            param.ClassLoader
-                        );
-                    }
+    class SelfDemoHook : XC_MethodHook
+    {
+        protected override void BeforeHookedMethod(MethodHookParam? param)
+        {
+            var toast = Toast.MakeText(((View)param!.Args![0]).Context, "Greeting from C#:\nAll your base are belong to us!", ToastLength.Long);
+            toast?.Show();
 
-                    if (hitReceptorClass == null)
-                    {
-                        XposedBridge.Log("OsuRelax: Could not find HitReceptor class!");
-                        return;
-                    }
-
-                    XposedBridge.Log("OsuRelax: Hooking HitReceptor.Hit()...");
-
-                    XposedHelpers.FindAndHookMethod(hitReceptorClass, "Hit", new XC_MethodHook
-                    {
-                        BeforeHookedMethod = param =>
-                        {
-                            XposedBridge.Log("OsuRelax: HIT DETECTED! Auto-processing...");
-                        },
-                        AfterHookedMethod = param =>
-                        {
-                            // Hit already processed by game
-                        }
-                    });
-                }
-                catch (Exception ex)
-                {
-                    XposedBridge.Log("OsuRelax: HookHitReceptor error: " + ex.Message);
-                }
-            }
-
-            private void HookHitCircleCheckResult(XC_LoadPackage.LoadPackageParam param)
-            {
-                try
-                {
-                    var hitCircleClass = XposedHelpers.FindClass(
-                        "osu.Game.Rulesets.Osu.Objects.Drawables.DrawableHitCircle",
-                        param.ClassLoader
-                    );
-
-                    if (hitCircleClass == null)
-                    {
-                        XposedBridge.Log("OsuRelax: DrawableHitCircle class not found!");
-                        return;
-                    }
-
-                    XposedBridge.Log("OsuRelax: Hooking DrawableHitCircle.CheckForResult()...");
-
-                    // CheckForResult(bool userTriggered, double timeOffset)
-                    XposedHelpers.FindAndHookMethod(
-                        hitCircleClass,
-                        "CheckForResult",
-                        typeof(bool),
-                        typeof(double),
-                        new XC_MethodReplacement
-                        {
-                            ReplaceHookedMethod = param =>
-                            {
-                                // Force successful hit by letting original method determine result
-                                // but log it
-                                XposedBridge.Log("OsuRelax: Auto-check result...");
-                                param.InvokeOriginalMethod();
-                            }
-                        }
-                    );
-                }
-                catch (Exception ex)
-                {
-                    XposedBridge.Log("OsuRelax: HookHitCircleCheckResult error: " + ex.Message);
-                }
-            }
-
-            private void HookHitReceptorOnPressed(XC_LoadPackage.LoadPackageParam param)
-            {
-                try
-                {
-                    var hitReceptorClass = XposedHelpers.FindClass(
-                        "osu.Game.Rulesets.Osu.Objects.Drawables+HitReceptor",
-                        param.ClassLoader
-                    );
-
-                    if (hitReceptorClass == null) return;
-
-                    XposedBridge.Log("OsuRelax: Hooking HitReceptor.OnPressed()...");
-
-                    // Try to find KeyBindingPressEvent
-                    var keyEventClass = XposedHelpers.FindClass(
-                        "osu.Framework.Input.Events.KeyBindingPressEvent",
-                        param.ClassLoader
-                    );
-
-                    if (keyEventClass != null)
-                    {
-                        XposedHelpers.FindAndHookMethod(
-                            hitReceptorClass,
-                            "OnPressed",
-                            keyEventClass,
-                            new XC_MethodHook
-                            {
-                                BeforeHookedMethod = param =>
-                                {
-                                    // Always return true - hit counts!
-                                    param.SetResult(true);
-                                    XposedBridge.Log("OsuRelax: Auto-pressed (true)!");
-                                }
-                            }
-                        );
-                    }
-                }
-                catch (Exception ex)
-                {
-                    XposedBridge.Log("OsuRelax: HookHitReceptorOnPressed error: " + ex.Message);
-                }
-            }
+            base.BeforeHookedMethod(param);
         }
     }
 }

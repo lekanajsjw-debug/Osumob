@@ -1,11 +1,16 @@
-<Project Sdk="Microsoft.NET.Sdk">
-
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net9.0-android</TargetFramework>
-    <CheckEolTargetFramework>false</CheckEolTargetFramework>
-    <RootNamespace>XPosedAPI</RootNamespace>
-    <AssemblyName>XPosedAPI</AssemblyName>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <TargetFramework>net10.0-android</TargetFramework>
+    <SupportedOSPlatformVersion>21.0</SupportedOSPlatformVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RunPostBuildEvent>Always</RunPostBuildEvent>
+	<BaseOutputPath>..\ref\</BaseOutputPath>
   </PropertyGroup>
-
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <AndroidPackageFormat>apk</AndroidPackageFormat>
+  </PropertyGroup>
+  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
+	  <Exec Command="del &quot;$(ProjectDir)$(OutDir)XPosedAPI.aar&quot;" ConsoleToMSBuild="true" IgnoreExitCode="true" />
+  </Target>
 </Project>
