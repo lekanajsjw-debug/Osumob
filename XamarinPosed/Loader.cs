@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Reflection;
 using Android.App;
 using Android.Content;
 using Android.Runtime;
@@ -14,7 +15,9 @@ namespace XamarinPosed
 {
     /// <summary>
     /// Main Xposed module entry point for Xamarin Android apps
-    /// Supports both Xamarin.Android and .NET MAUI apps
+    /// Supports both Java hooks and C# hooks via embedded Mono
+    /// 
+    /// C# hooks work by intercepting calls at Mono runtime level
     /// </summary>
     [Register("xamarin/posed/Loader")]
     public class Loader : Java.Lang.Object, IXposedHookLoadPackage, IXposedHookZygoteInit, IXposedHookInitPackageResources
@@ -25,16 +28,31 @@ namespace XamarinPosed
         private static volatile bool _initialized = false;
         private static readonly object _lock = new object();
         
-        // Configuration (can be changed via Xposed TP)
+        // ============= CONFIGURATION =============
+        // Toggle hooks on/off
         public static bool EnableLogging = true;
         public static bool HookAllApps = false;
-        public static bool EnableActivityHooks = true;
-        public static bool EnableViewHooks = true;
-        public static bool EnableContextHooks = true;
-        public static bool EnableClassLoaderHooks = true;
+        
+        // Java level hooks (Xposed - works out of box)
+        public static bool EnableJavaHooks = true;
+        
+        // C# level hooks (requires Mono bridge - experimental)
+        // NOTE: C# hooks need native libxamarinhooks.so + embedded Mono
+        // Currently NOT available in standard Xposed module
+        public static bool EnableCSharpHooks = false; // Disabled - needs native lib
+        
+        // Native library loaded?
+        private static bool _nativeLibLoaded = false;
         
         // Tracked packages (thread-safe)
         private static readonly HashSet<string> _hookedPackages = new HashSet<string>();
+        
+        // ============= C# HOOK REGISTRY =============
+        // Register your C# hooks here
+        // These will be called from Java hooks via JNI bridge (when available)
+        private static readonly Dictionary<string, HookDelegate> _csharpHooks = new Dictionary<string, HookDelegate>();
+        
+        public delegate void HookDelegate(object[] args);
         
         #region Constructors
         public Loader() : base(IntPtr.Zero, JniHandleOwnership.DoNotTransfer)
@@ -43,15 +61,34 @@ namespace XamarinPosed
             {
                 var handle = JniConstructorReferences.CreateInstance("()V", this);
                 base.SetHandle(handle, JniHandleOwnership.DoNotTransfer);
-                LogInfo("Loader v4.0 initialized");
+                LogInfo("XamarinPosed v4.1 loaded");
+                
+                // Try to load native library (if present)
+                TryLoadNativeLib();
             }
             catch (Exception ex)
             {
-                LogError($"Constructor error: {ex.Message}");
+                LogError($"Init error: {ex.Message}");
             }
         }
 
         public Loader(IntPtr handle, JniHandleOwnership transfer) : base(handle, transfer) { }
+        
+        private void TryLoadNativeLib()
+        {
+            try
+            {
+                System.LoadLibrary("xamarinhooks");
+                _nativeLibLoaded = true;
+                LogInfo("Native lib loaded");
+            }
+            catch
+            {
+                // Native lib not available - C# hooks disabled
+                LogInfo("Native lib not found - C# hooks via JNI disabled");
+                _nativeLibLoaded = false;
+            }
+        }
         #endregion
         
         #region IXposedHookLoadPackage
@@ -62,23 +99,29 @@ namespace XamarinPosed
             try
             {
                 string packageName = param.PackageName;
-                LogInfo($"Loading: {packageName}");
+                LogInfo($"Load: {packageName}");
                 
-                bool shouldHook = HookAllApps || IsXamarinApp(param) || IsMauiApp(param) || IsNetAndroidApp(param);
+                // Detect app type
+                bool shouldHook = HookAllApps || IsTargetApp(param);
                 
                 if (shouldHook)
                 {
                     lock (_lock)
                     {
                         if (_hookedPackages.Contains(packageName))
-                        {
                             return;
-                        }
                         _hookedPackages.Add(packageName);
                     }
                     
                     LogInfo($"Hooking: {packageName}");
-                    HookXamarinApp(param);
+                    
+                    // Java hooks (always available)
+                    if (EnableJavaHooks)
+                        HookWithJava(param);
+                    
+                    // C# hooks (needs native lib)
+                    if (EnableCSharpHooks && _nativeLibLoaded)
+                        HookWithCSharp(param);
                 }
             }
             catch (Exception ex)
@@ -96,7 +139,7 @@ namespace XamarinPosed
             try
             {
                 _initialized = true;
-                LogInfo($"Zygote ready: {param.ModulePath}");
+                LogInfo($"Zygote: {param.ModulePath}");
             }
             catch (Exception ex)
             {
@@ -116,16 +159,13 @@ namespace XamarinPosed
             }
             catch (Exception ex)
             {
-                LogError($"HandleInitPackageResources: {ex.Message}");
+                LogError($"InitPackageResources: {ex.Message}");
             }
         }
         #endregion
         
         #region App Detection
-        /// <summary>
-        /// Detect Xamarin.Android apps by native libraries
-        /// </summary>
-        private bool IsXamarinApp(XC_LoadPackage.LoadPackageParam param)
+        private bool IsTargetApp(XC_LoadPackage.LoadPackageParam param)
         {
             try
             {
@@ -133,48 +173,13 @@ namespace XamarinPosed
                 if (string.IsNullOrEmpty(nativeDir) || !Directory.Exists(nativeDir))
                     return false;
                 
-                string[] xamarinLibs = 
+                // Check for Xamarin/Mono/MAUI libs
+                string[] targetLibs = 
                 {
                     "libxamarin-app.so",
                     "libmono-native.so", 
                     "libmonodroid.so",
                     "libmonosgen-2.0.so",
-                    "libxamarin-debug-app-helper.so"
-                };
-                
-                foreach (var file in Directory.EnumerateFiles(nativeDir))
-                {
-                    var libName = Path.GetFileName(file);
-                    foreach (var lib in xamarinLibs)
-                    {
-                        if (libName.Equals(lib, StringComparison.OrdinalIgnoreCase))
-                        {
-                            LogInfo($"Xamarin.Android detected: {libName}");
-                            return true;
-                        }
-                    }
-                }
-                return false;
-            }
-            catch
-            {
-                return false;
-            }
-        }
-        
-        /// <summary>
-        /// Detect .NET MAUI apps
-        /// </summary>
-        private bool IsMauiApp(XC_LoadPackage.LoadPackageParam param)
-        {
-            try
-            {
-                var nativeDir = param.AppInfo?.NativeLibraryDir;
-                if (string.IsNullOrEmpty(nativeDir) || !Directory.Exists(nativeDir))
-                    return false;
-                
-                string[] mauiLibs = 
-                {
                     "libmaui.so",
                     "libmaui-native.so"
                 };
@@ -182,11 +187,11 @@ namespace XamarinPosed
                 foreach (var file in Directory.EnumerateFiles(nativeDir))
                 {
                     var libName = Path.GetFileName(file);
-                    foreach (var lib in mauiLibs)
+                    foreach (var lib in targetLibs)
                     {
                         if (libName.Equals(lib, StringComparison.OrdinalIgnoreCase))
                         {
-                            LogInfo($".NET MAUI detected: {libName}");
+                            LogInfo($"Target: {libName}");
                             return true;
                         }
                     }
@@ -198,286 +203,165 @@ namespace XamarinPosed
                 return false;
             }
         }
-        
-        /// <summary>
-        /// Detect NET Android apps (older Xamarin)
-        /// </summary>
-        private bool IsNetAndroidApp(XC_LoadPackage.LoadPackageParam param)
-        {
-            try
-            {
-                var apkPath = param.AppInfo?.SourceDir;
-                if (string.IsNullOrEmpty(apkPath))
-                    return false;
-                
-                // Check for specific class names in APK
-                if (apkPath.Contains("netandroid") || apkPath.Contains("xamarin"))
-                {
-                    LogInfo($"NET Android app: {param.PackageName}");
-                    return true;
-                }
-                return false;
-            }
-            catch
-            {
-                return false;
-            }
-        }
         #endregion
         
-        #region Hook Methods
-        /// <summary>
-        /// Main hook orchestration
-        /// </summary>
-        private void HookXamarinApp(XC_LoadPackage.LoadPackageParam param)
+        #region Java Hooks (Xposed - works)
+        private void HookWithJava(XC_LoadPackage.LoadPackageParam param)
         {
             try
             {
-                LogInfo($"Hooking {param.PackageName}");
+                LogInfo("Setting up Java hooks...");
                 
-                // Hook Application
-                HookApplicationClass(param);
-                
-                // Hook Context
-                if (EnableContextHooks)
-                    HookContextClass(param);
-                
-                // Hook ClassLoader
-                if (EnableClassLoaderHooks)
-                    HookClassLoader(param);
-                
-                // Hook Activity lifecycle
-                if (EnableActivityHooks)
-                    HookActivityMethods(param);
-                
-                // Hook View interactions
-                if (EnableViewHooks)
-                    HookViewListeners(param);
-                
-                // Hook Content providers
-                HookContentProviders(param);
-                
-                LogInfo($"Hooks enabled for: {param.PackageName}");
-            }
-            catch (Exception ex)
-            {
-                LogError($"HookXamarinApp: {ex.Message}");
-            }
-        }
-        
-        /// <summary>
-        /// Hook Application lifecycle
-        /// </summary>
-        private void HookApplicationClass(XC_LoadPackage.LoadPackageParam param)
-        {
-            try
-            {
-                // Application.attach()
+                // Hook Application lifecycle
                 XposedHelpers.FindAndHookMethod(
                     "android.app.Application", 
                     param.ClassLoader,
                     "attach",
                     "android.content.Context",
-                    new ApplicationAttachHook());
-                    
-                // Application.onCreate()
+                    new JavaHooks.ApplicationAttachHook(CallCSharpHooks));
+                
                 XposedHelpers.FindAndHookMethod(
                     "android.app.Application",
                     param.ClassLoader,
                     "onCreate",
-                    new ApplicationOnCreateHook());
-                    
-                LogInfo("Application hooks OK");
-            }
-            catch (Exception ex)
-            {
-                LogError($"HookApplicationClass: {ex.Message}");
-            }
-        }
-        
-        /// <summary>
-        /// Hook Context methods
-        /// </summary>
-        private void HookContextClass(XC_LoadPackage.LoadPackageParam param)
-        {
-            try
-            {
-                // Context.getClassLoader()
-                XposedHelpers.FindAndHookMethod(
-                    "android.content.Context",
-                    param.ClassLoader,
-                    "getClassLoader",
-                    new ContextGetClassLoaderHook());
-                    
-                // Context.getPackageName()
-                XposedHelpers.FindAndHookMethod(
-                    "android.content.Context",
-                    param.ClassLoader,
-                    "getPackageName",
-                    new ContextGetPackageNameHook());
-                    
-                LogInfo("Context hooks OK");
-            }
-            catch (Exception ex)
-            {
-                LogError($"HookContextClass: {ex.Message}");
-            }
-        }
-        
-        /// <summary>
-        /// Hook ClassLoader
-        /// </summary>
-        private void HookClassLoader(XC_LoadPackage.LoadPackageParam param)
-        {
-            try
-            {
-                // BaseDexClassLoader
-                XposedHelpers.FindAndHookConstructor(
-                    "dalvik.system.BaseDexClassLoader",
-                    param.ClassLoader,
-                    new Java.Lang.String(),
-                    new Java.IO.File(),
-                    new Java.Lang.ClassLoader(),
-                    new DefClassDexClassLoaderHook());
-                    
-                LogInfo("ClassLoader hooks OK");
-            }
-            catch (Exception ex)
-            {
-                LogError($"HookClassLoader: {ex.Message}");
-            }
-        }
-        
-        /// <summary>
-        /// Hook Activity lifecycle
-        /// </summary>
-        private void HookActivityMethods(XC_LoadPackage.LoadPackageParam param)
-        {
-            try
-            {
-                // Activity.onCreate()
+                    new JavaHooks.ApplicationOnCreateHook(CallCSharpHooks));
+                
+                // Hook Activity lifecycle
                 XposedHelpers.FindAndHookMethod(
                     "android.app.Activity",
                     param.ClassLoader,
                     "onCreate",
                     "android.os.Bundle",
-                    new ActivityOnCreateHook());
-                    
-                // Activity.onStart()
-                XposedHelpers.FindAndHookMethod(
-                    "android.app.Activity",
-                    param.ClassLoader,
-                    "onStart",
-                    new ActivityOnStartHook());
-                    
-                // Activity.onResume()
+                    new JavaHooks.ActivityOnCreateHook(CallCSharpHooks));
+                
                 XposedHelpers.FindAndHookMethod(
                     "android.app.Activity",
                     param.ClassLoader,
                     "onResume",
-                    new ActivityOnResumeHook());
-                    
-                // Activity.onPause()
-                XposedHelpers.FindAndHookMethod(
-                    "android.app.Activity",
-                    param.ClassLoader,
-                    "onPause",
-                    new ActivityOnPauseHook());
-                    
-                // Activity.onStop()
-                XposedHelpers.FindAndHookMethod(
-                    "android.app.Activity",
-                    param.ClassLoader,
-                    "onStop",
-                    new ActivityOnStopHook());
-                    
-                // Activity.onDestroy()
-                XposedHelpers.FindAndHookMethod(
-                    "android.app.Activity",
-                    param.ClassLoader,
-                    "onDestroy",
-                    new ActivityOnDestroyHook());
-                    
-                LogInfo("Activity hooks OK");
-            }
-            catch (Exception ex)
-            {
-                LogError($"HookActivityMethods: {ex.Message}");
-            }
-        }
-        
-        /// <summary>
-        /// Hook View interactions
-        /// </summary>
-        private void HookViewListeners(XC_LoadPackage.LoadPackageParam param)
-        {
-            try
-            {
-                // View.setOnClickListener()
+                    new JavaHooks.ActivityOnResumeHook(CallCSharpHooks));
+                
+                // Hook Views
                 XposedHelpers.FindAndHookMethod(
                     "android.view.View",
                     param.ClassLoader,
                     "setOnClickListener",
                     "android.view.View$OnClickListener",
-                    new ViewSetOnClickListenerHook());
-                    
-                // View.setOnLongClickListener()
-                XposedHelpers.FindAndHookMethod(
-                    "android.view.View",
-                    param.ClassLoader,
-                    "setOnLongClickListener",
-                    "android.view.View$OnLongClickListener",
-                    new ViewSetOnLongClickListenerHook());
-                    
-                // View.performClick()
-                XposedHelpers.FindAndHookMethod(
-                    "android.view.View",
-                    param.ClassLoader,
-                    "performClick",
-                    new ViewPerformClickHook());
-                    
-                LogInfo("View hooks OK");
+                    new JavaHooks.ViewSetOnClickListenerHook(CallCSharpHooks));
+                
+                LogInfo("Java hooks active");
             }
             catch (Exception ex)
             {
-                LogError($"HookViewListeners: {ex.Message}");
+                LogError($"Java hooks: {ex.Message}");
             }
         }
         
-        /// <summary>
-        /// Hook Content Providers
-        /// </summary>
-        private void HookContentProviders(XC_LoadPackage.LoadPackageParam param)
+        // Pass C# hook data to Java hooks
+        private void CallCSharpHooks(string hookName, object[] args)
+        {
+            if (!EnableCSharpHooks || !_nativeLibLoaded) return;
+            
+            try
+            {
+                if (_csharpHooks.TryGetValue(hookName, out var del))
+                {
+                    del.Invoke(args);
+                }
+            }
+            catch (Exception ex)
+            {
+                LogError($"C# hook '{hookName}': {ex.Message}");
+            }
+        }
+        
+        #endregion
+        
+        #region C# Hooks (needs native lib)
+        private void HookWithCSharp(XC_LoadPackage.LoadPackageParam param)
         {
             try
             {
-                // ContentProvider.attachInfo()
-                XposedHelpers.FindAndHookMethod(
-                    "android.content.ContentProvider",
-                    param.ClassLoader,
-                    "attachInfo",
-                    "android.content.Context",
-                    "android.content.pm.ProviderInfo",
-                    new ContentProviderAttachInfoHook());
-                    
-                LogInfo("ContentProvider hooks OK");
+                // This calls native code which interacts with Mono runtime
+                // NOT available without custom native library
+                NativeInitHooks(param.PackageName, param.ClassLoader);
+                LogInfo("C# hooks initialized");
             }
             catch (Exception ex)
             {
-                LogError($"HookContentProviders: {ex.Message}");
+                LogError($"C# hooks: {ex.Message}");
             }
+        }
+        
+        // JNI native methods (native lib required)
+        private native void NativeInitHooks(string packageName, IntPtr classLoader);
+        private native object NativeCallMethod(string methodName, object[] args);
+        #endregion
+        
+        #region Public API - Register C# Hooks
+        /// <summary>
+        /// Register a C# hook method
+        /// </summary>
+        public static void RegisterHook(string name, HookDelegate callback)
+        {
+            _csharpHooks[name] = callback;
+            LogInfo($"Registered C# hook: {name}");
+        }
+        
+        /// <summary>
+        /// Unregister a C# hook
+        /// </summary>
+        public static void UnregisterHook(string name)
+        {
+            _csharpHooks.Remove(name);
+            LogInfo($"Unregistered C# hook: {name}");
+        }
+        
+        /// <summary>
+        /// Get all registered hooks
+        /// </summary>
+        public static string[] GetRegisteredHooks()
+        {
+            var hooks = new string[_csharpHooks.Count];
+            _csharpHooks.Keys.CopyTo(hooks, 0);
+            return hooks;
         }
         #endregion
         
-        #region Hook Classes - Application
+        #region Logging
+        private static void LogInfo(string message)
+        {
+            if (EnableLogging)
+                Log.Info(Tag, message);
+        }
+        
+        private static void LogError(string message)
+        {
+            Log.E(Tag, message);
+        }
+        #endregion
+    }
+    
+    // ============= JAVA HOOKS =============
+    namespace JavaHooks
+    {
+        // Delegate for calling C# hooks from Java
+        public delegate void CSharpHookCallback(string hookName, object[] args);
+        
         class ApplicationAttachHook : XC_MethodHook
         {
+            private CSharpHookCallback _callback;
+            
+            public ApplicationAttachHook(CSharpHookCallback callback)
+            {
+                _callback = callback;
+            }
+            
             protected override void BeforeHookedMethod(MethodHookParam? param)
             {
                 try
                 {
                     var context = param?.Args?[0];
-                    LogInfo($"App.attach: {context?.GetType()?.Name}");
+                    _callback?.Invoke("Application.attach", new[] { context });
                 }
                 catch { }
                 base.BeforeHookedMethod(param);
@@ -486,87 +370,40 @@ namespace XamarinPosed
         
         class ApplicationOnCreateHook : XC_MethodHook
         {
-            protected override void AfterHookedMethod(MethodHookParam? param)
+            private CSharpHookCallback _callback;
+            
+            public ApplicationOnCreateHook(CSharpHookCallback callback)
             {
-                try
-                {
-                    var app = param?.ThisObject;
-                    LogInfo($"App.onCreate: {app?.GetType()?.Name}");
-                }
-                catch { }
-                base.AfterHookedMethod(param);
+                _callback = callback;
             }
-        }
-        #endregion
-        
-        #region Hook Classes - Context
-        class ContextGetClassLoaderHook : XC_MethodHook
-        {
+            
             protected override void AfterHookedMethod(MethodHookParam? param)
             {
                 try
                 {
-                    var cl = param?.Result;
-                    LogInfo($"Context.getClassLoader: {cl?.GetType()?.Name}");
+                    _callback?.Invoke("Application.onCreate", null);
                 }
                 catch { }
                 base.AfterHookedMethod(param);
             }
         }
         
-        class ContextGetPackageNameHook : XC_MethodHook
-        {
-            protected override void AfterHookedMethod(MethodHookParam? param)
-            {
-                try
-                {
-                    var pkgName = param?.Result;
-                    LogInfo($"Context.getPackageName: {pkgName}");
-                }
-                catch { }
-                base.AfterHookedMethod(param);
-            }
-        }
-        #endregion
-        
-        #region Hook Classes - ClassLoader
-        class DefClassDexClassLoaderHook : XC_MethodHook
-        {
-            protected override void AfterHookedMethod(MethodHookParam? param)
-            {
-                try
-                {
-                    LogInfo($"DexClassLoader created");
-                }
-                catch { }
-                base.AfterHookedMethod(param);
-            }
-        }
-        #endregion
-        
-        #region Hook Classes - Activity
         class ActivityOnCreateHook : XC_MethodHook
         {
-            protected override void AfterHookedMethod(MethodHookParam? param)
+            private CSharpHookCallback _callback;
+            
+            public ActivityOnCreateHook(CSharpHookCallback callback)
             {
-                try
-                {
-                    var activity = param?.ThisObject;
-                    LogInfo($"Activity.onCreate: {activity?.GetType()?.Name}");
-                }
-                catch { }
-                base.AfterHookedMethod(param);
+                _callback = callback;
             }
-        }
-        
-        class ActivityOnStartHook : XC_MethodHook
-        {
+            
             protected override void AfterHookedMethod(MethodHookParam? param)
             {
                 try
                 {
                     var activity = param?.ThisObject;
-                    LogInfo($"Activity.onStart: {activity?.GetType()?.Name}");
+                    var bundle = param?.Args?[0];
+                    _callback?.Invoke("Activity.onCreate", new[] { activity, bundle });
                 }
                 catch { }
                 base.AfterHookedMethod(param);
@@ -575,138 +412,45 @@ namespace XamarinPosed
         
         class ActivityOnResumeHook : XC_MethodHook
         {
+            private CSharpHookCallback _callback;
+            
+            public ActivityOnResumeHook(CSharpHookCallback callback)
+            {
+                _callback = callback;
+            }
+            
             protected override void AfterHookedMethod(MethodHookParam? param)
             {
                 try
                 {
                     var activity = param?.ThisObject;
-                    LogInfo($"Activity.onResume: {activity?.GetType()?.Name}");
+                    _callback?.Invoke("Activity.onResume", new[] { activity });
                 }
                 catch { }
                 base.AfterHookedMethod(param);
             }
         }
         
-        class ActivityOnPauseHook : XC_MethodHook
-        {
-            protected override void BeforeHookedMethod(MethodHookParam? param)
-            {
-                try
-                {
-                    var activity = param?.ThisObject;
-                    LogInfo($"Activity.onPause: {activity?.GetType()?.Name}");
-                }
-                catch { }
-                base.BeforeHookedMethod(param);
-            }
-        }
-        
-        class ActivityOnStopHook : XC_MethodHook
-        {
-            protected override void AfterHookedMethod(MethodHookParam? param)
-            {
-                try
-                {
-                    var activity = param?.ThisObject;
-                    LogInfo($"Activity.onStop: {activity?.GetType()?.Name}");
-                }
-                catch { }
-                base.AfterHookedMethod(param);
-            }
-        }
-        
-        class ActivityOnDestroyHook : XC_MethodHook
-        {
-            protected override void BeforeHookedMethod(MethodHookParam? param)
-            {
-                try
-                {
-                    var activity = param?.ThisObject;
-                    LogInfo($"Activity.onDestroy: {activity?.GetType()?.Name}");
-                }
-                catch { }
-                base.BeforeHookedMethod(param);
-            }
-        }
-        #endregion
-        
-        #region Hook Classes - View
         class ViewSetOnClickListenerHook : XC_MethodHook
         {
+            private CSharpHookCallback _callback;
+            
+            public ViewSetOnClickListenerHook(CSharpHookCallback callback)
+            {
+                _callback = callback;
+            }
+            
             protected override void BeforeHookedMethod(MethodHookParam? param)
             {
                 try
                 {
                     var view = param?.ThisObject;
                     var listener = param?.Args?[0];
-                    LogInfo($"View.setOnClick: {view?.GetType()?.Name} <- {listener?.GetType()?.Name}");
+                    _callback?.Invoke("View.setOnClickListener", new[] { view, listener });
                 }
                 catch { }
                 base.BeforeHookedMethod(param);
             }
         }
-        
-        class ViewSetOnLongClickListenerHook : XC_MethodHook
-        {
-            protected override void BeforeHookedMethod(MethodHookParam? param)
-            {
-                try
-                {
-                    var view = param?.ThisObject;
-                    var listener = param?.Args?[0];
-                    LogInfo($"View.setOnLongClick: {view?.GetType()?.Name} <- {listener?.GetType()?.Name}");
-                }
-                catch { }
-                base.BeforeHookedMethod(param);
-            }
-        }
-        
-        class ViewPerformClickHook : XC_MethodHook
-        {
-            protected override void AfterHookedMethod(MethodHookParam? param)
-            {
-                try
-                {
-                    var view = param?.ThisObject;
-                    var result = param?.Result;
-                    LogInfo($"View.performClick: {view?.GetType()?.Name} = {result}");
-                }
-                catch { }
-                base.AfterHookedMethod(param);
-            }
-        }
-        #endregion
-        
-        #region Hook Classes - ContentProvider
-        class ContentProviderAttachInfoHook : XC_MethodHook
-        {
-            protected override void BeforeHookedMethod(MethodHookParam? param)
-            {
-                try
-                {
-                    var context = param?.Args?[0];
-                    var info = param?.Args?[1];
-                    LogInfo($"ContentProvider.attachInfo: {context?.GetType()?.Name}, {info?.GetType()?.Name}");
-                }
-                catch { }
-                base.BeforeHookedMethod(param);
-            }
-        }
-        #endregion
-        
-        #region Logging
-        private static void LogInfo(string message)
-        {
-            if (EnableLogging)
-            {
-                Log.Info(Tag, message);
-            }
-        }
-        
-        private static void LogError(string message)
-        {
-            Log.E(tag, message);
-        }
-        #endregion
     }
 }
